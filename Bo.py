@@ -1,6 +1,5 @@
 import streamlit as st
 from collections import deque
-import numpy as np
 from typing import List, Dict
 
 class BacBoPredictor:
@@ -16,29 +15,34 @@ class BacBoPredictor:
         result = result.upper()
         if result not in ['PLAYER', 'BANKER', 'TIE']:
             raise ValueError("Resultado inválido")
+        
         self.game_history.append(result)
         
+        # Faz previsão automática após 5 jogadas
         if len(self.game_history) >= 5:
             self.last_prediction = self.predict_next()
+            st.session_state.last_prediction = self.last_prediction
             
+            # Atualiza estatísticas se não for a primeira previsão
             if len(self.game_history) > 5:
                 self._update_stats(result)
                 self._update_win_rate()
 
     def _update_win_rate(self):
         if self.prediction_stats['total'] > 0:
-            self.prediction_stats['win_rate'] = (
-                self.prediction_stats['wins'] / self.prediction_stats['total'] * 100
+            self.prediction_stats['win_rate'] = round(
+                (self.prediction_stats['wins'] / self.prediction_stats['total']) * 100, 1
             )
 
     def _update_stats(self, actual_result: str):
-        if self.last_prediction['prediction'] == actual_result:
+        if st.session_state.last_prediction['prediction'] == actual_result:
             self.prediction_stats['wins'] += 1
         self.prediction_stats['total'] += 1
+        
         self.last_predictions.append({
-            'predicted': self.last_prediction['prediction'],
+            'predicted': st.session_state.last_prediction['prediction'],
             'actual': actual_result,
-            'confidence': self.last_prediction['confidence']
+            'confidence': st.session_state.last_prediction['confidence']
         })
 
     def predict_next(self) -> Dict:
@@ -46,10 +50,16 @@ class BacBoPredictor:
             return {'prediction': None, 'confidence': 0, 'reason': 'Histórico insuficiente'}
         
         try:
+            # 1. Análise Quântica
             quantum = self._analyze_quantum_pattern()
+            
+            # 2. Fibonacci Dinâmico
             fibonacci = self._analyze_dynamic_fibonacci()
+            
+            # 3. Pontos de Pressão
             pressure = self._analyze_pressure_points()
             
+            # Combinação ponderada
             predictions = [
                 {'method': quantum, 'weight': 0.45},
                 {'method': fibonacci, 'weight': 0.35},
@@ -62,9 +72,7 @@ class BacBoPredictor:
                 return self._smart_fallback()
             
             final_pred = self._aggregate_predictions(valid_preds)
-            final_pred = self._apply_bayesian_correction(final_pred)
-            
-            return final_pred
+            return self._apply_bayesian_correction(final_pred)
             
         except Exception as e:
             return {'prediction': None, 'confidence': 0, 'reason': f'Erro: {str(e)}'}
@@ -194,9 +202,9 @@ class BacBoPredictor:
 
     def get_stats(self) -> Dict:
         stats = {
-            'win_rate': round(self.prediction_stats.get('win_rate', 0), 1),
-            'wins': self.prediction_stats.get('wins', 0),
-            'total': self.prediction_stats.get('total', 0),
+            'win_rate': self.prediction_stats['win_rate'],
+            'wins': self.prediction_stats['wins'],
+            'total': self.prediction_stats['total'],
             'recent_predictions': list(self.last_predictions)
         }
         
@@ -212,8 +220,8 @@ class BacBoPredictor:
         self.game_history = []
         self.prediction_stats = {'wins': 0, 'total': 0, 'win_rate': 0.0}
         self.last_predictions = deque(maxlen=20)
-        if hasattr(self, 'last_prediction'):
-            del self.last_prediction
+        if 'last_prediction' in st.session_state:
+            del st.session_state.last_prediction
 
 # Configuração do Streamlit
 st.set_page_config(
@@ -226,13 +234,13 @@ st.set_page_config(
 st.markdown("""
 <style>
 /* Botões grandes */
-.big-btn {
-    height: 100px;
+.stButton>button {
+    height: 100px !important;
+    width: 100% !important;
     font-size: 24px !important;
     font-weight: bold !important;
-    margin: 5px;
     border-radius: 10px !important;
-    width: 100% !important;
+    margin: 5px 0 !important;
 }
 .player-btn {
     background-color: #3b82f6 !important;
@@ -353,33 +361,32 @@ with col1:
 
 with col2:
     # Previsão automática
-    if len(st.session_state.predictor.game_history) >= 5 and hasattr(st.session_state.predictor, 'last_prediction'):
-        pred = st.session_state.predictor.last_prediction
-        if pred['prediction']:
-            # Determina estilo baseado na confiança
-            if pred['confidence'] >= 75:
-                confidence_class = "high-confidence"
-                confidence_level = "ALTA CONFIANÇA"
-                confidence_emoji = "🔥"
-            elif pred['confidence'] >= 60:
-                confidence_class = "medium-confidence"
-                confidence_level = "MÉDIA CONFIANÇA"
-                confidence_emoji = "⚡"
-            else:
-                confidence_class = "low-confidence"
-                confidence_level = "BAIXA CONFIANÇA"
-                confidence_emoji = "💡"
-            
-            # Cor do texto
-            pred_color = "#3b82f6" if pred['prediction'] == "PLAYER" else "#ef4444" if pred['prediction'] == "BANKER" else "#a855f7"
-            
-            st.markdown(f"""
-            <div class="prediction-card {confidence_class}">
-                <h2 style="margin-top:0;color:{pred_color};">PRÓXIMA APOSTA: {pred['prediction']}</h2>
-                <p style="font-size:18px;"><strong>{confidence_emoji} Confiança:</strong> <span style="color:{pred_color}">{pred['confidence']:.1f}%</span> ({confidence_level})</p>
-                <p style="font-size:16px;"><strong>📊 Lógica:</strong> {pred['reason']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+    if 'last_prediction' in st.session_state and st.session_state.last_prediction['prediction']:
+        pred = st.session_state.last_prediction
+        
+        # Determina estilo baseado na confiança
+        if pred['confidence'] >= 75:
+            confidence_class = "high-confidence"
+            confidence_level = "ALTA CONFIANÇA"
+            confidence_emoji = "🔥"
+        elif pred['confidence'] >= 60:
+            confidence_class = "medium-confidence"
+            confidence_level = "MÉDIA CONFIANÇA"
+            confidence_emoji = "⚡"
+        else:
+            confidence_class = "low-confidence"
+            confidence_level = "BAIXA CONFIANÇA"
+            confidence_emoji = "💡"
+        
+        pred_color = "#3b82f6" if pred['prediction'] == "PLAYER" else "#ef4444" if pred['prediction'] == "BANKER" else "#a855f7"
+        
+        st.markdown(f"""
+        <div class="prediction-card {confidence_class}">
+            <h2 style="margin-top:0;color:{pred_color};">PRÓXIMA APOSTA: {pred['prediction']}</h2>
+            <p style="font-size:18px;"><strong>{confidence_emoji} Confiança:</strong> <span style="color:{pred_color}">{pred['confidence']:.1f}%</span> ({confidence_level})</p>
+            <p style="font-size:16px;"><strong>📊 Lógica:</strong> {pred['reason']}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Estatísticas
     stats = st.session_state.predictor.get_stats()
@@ -401,15 +408,15 @@ with col2:
 
 # Rodapé
 st.markdown("---")
-st.caption("Sistema Bac Bo Predictor PRO v5.2 - © 2023 | Algoritmo: Análise Quântica + Fibonacci Dinâmico")
+st.caption("Sistema Bac Bo Predictor PRO v5.3 - © 2023 | Algoritmo: Análise Quântica + Fibonacci Dinâmico")
 
-# Aplicar CSS aos botões
+# Aplicar classes CSS específicas via JavaScript
 st.markdown("""
 <script>
 // Aplica classes CSS aos botões
-document.querySelector('button[data-testid="baseButton-secondary"][title="Clique para registrar vitória do Player"]').classList.add('big-btn', 'player-btn');
-document.querySelector('button[data-testid="baseButton-secondary"][title="Clique para registrar vitória do Banker"]').classList.add('big-btn', 'banker-btn');
-document.querySelector('button[data-testid="baseButton-secondary"][title="Clique para registrar um Tie"]').classList.add('big-btn', 'tie-btn');
-document.querySelector('button[data-testid="baseButton-secondary"][title="Limpa todo o histórico"]').classList.add('big-btn', 'reset-btn');
+document.querySelector('button[title="Clique para registrar vitória do Player"]').classList.add('player-btn');
+document.querySelector('button[title="Clique para registrar vitória do Banker"]').classList.add('banker-btn');
+document.querySelector('button[title="Clique para registrar um Tie"]').classList.add('tie-btn');
+document.querySelector('button[title="Limpa todo o histórico"]').classList.add('reset-btn');
 </script>
 """, unsafe_allow_html=True)
