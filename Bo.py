@@ -18,12 +18,10 @@ class BacBoPredictor:
         
         self.game_history.append(result)
         
-        # Faz previsão automática após 5 jogadas
         if len(self.game_history) >= 5:
             self.last_prediction = self.predict_next()
             st.session_state.last_prediction = self.last_prediction
             
-            # Atualiza estatísticas se não for a primeira previsão
             if len(self.game_history) > 5:
                 self._update_stats(result)
                 self._update_win_rate()
@@ -35,31 +33,26 @@ class BacBoPredictor:
             )
 
     def _update_stats(self, actual_result: str):
-        if st.session_state.last_prediction['prediction'] == actual_result:
+        if hasattr(self, 'last_prediction') and self.last_prediction['prediction'] == actual_result:
             self.prediction_stats['wins'] += 1
         self.prediction_stats['total'] += 1
         
-        self.last_predictions.append({
-            'predicted': st.session_state.last_prediction['prediction'],
-            'actual': actual_result,
-            'confidence': st.session_state.last_prediction['confidence']
-        })
+        if hasattr(self, 'last_prediction'):
+            self.last_predictions.append({
+                'predicted': self.last_prediction['prediction'],
+                'actual': actual_result,
+                'confidence': self.last_prediction['confidence']
+            })
 
     def predict_next(self) -> Dict:
         if len(self.game_history) < 5:
             return {'prediction': None, 'confidence': 0, 'reason': 'Histórico insuficiente'}
         
         try:
-            # 1. Análise Quântica
             quantum = self._analyze_quantum_pattern()
-            
-            # 2. Fibonacci Dinâmico
             fibonacci = self._analyze_dynamic_fibonacci()
-            
-            # 3. Pontos de Pressão
             pressure = self._analyze_pressure_points()
             
-            # Combinação ponderada
             predictions = [
                 {'method': quantum, 'weight': 0.45},
                 {'method': fibonacci, 'weight': 0.35},
@@ -205,14 +198,13 @@ class BacBoPredictor:
             'win_rate': self.prediction_stats['win_rate'],
             'wins': self.prediction_stats['wins'],
             'total': self.prediction_stats['total'],
-            'recent_predictions': list(self.last_predictions)
+            'recent_predictions': list(self.last_predictions) if self.last_predictions else []
         }
         
-        if stats['total'] > 10:
-            last_10 = self.last_predictions[-10:]
-            stats['recent_win_rate'] = round(
-                sum(1 for p in last_10 if p['predicted'] == p['actual']) / len(last_10) * 100, 1
-            ) if last_10 else 0
+        if stats['total'] > 10 and self.last_predictions:
+            last_10 = list(self.last_predictions)[-10:]
+            correct = sum(1 for p in last_10 if p['predicted'] == p['actual'])
+            stats['recent_win_rate'] = round((correct / len(last_10)) * 100, 1) if last_10 else 0
             
         return stats
 
@@ -241,6 +233,11 @@ st.markdown("""
     font-weight: bold !important;
     border-radius: 10px !important;
     margin: 5px 0 !important;
+    transition: all 0.2s ease;
+}
+.stButton>button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 .player-btn {
     background-color: #3b82f6 !important;
@@ -277,6 +274,10 @@ st.markdown("""
     font-weight: bold;
     font-size: 14px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
+}
+.history-item:hover {
+    transform: scale(1.1);
 }
 .player-history {
     background-color: #3b82f6;
@@ -295,6 +296,10 @@ st.markdown("""
     margin: 20px 0;
     border-left: 6px solid;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+.prediction-card:hover {
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
 .high-confidence {
     border-color: #10b981;
@@ -307,6 +312,13 @@ st.markdown("""
 .low-confidence {
     border-color: #ef4444;
     background: linear-gradient(90deg, #7f1d1d10 0%, #7f1d1d05 100%);
+}
+
+/* Estatísticas */
+.stMetric {
+    border-radius: 10px;
+    padding: 15px;
+    background-color: rgba(255,255,255,0.05);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -408,15 +420,24 @@ with col2:
 
 # Rodapé
 st.markdown("---")
-st.caption("Sistema Bac Bo Predictor PRO v5.3 - © 2023 | Algoritmo: Análise Quântica + Fibonacci Dinâmico")
+st.caption("Sistema Bac Bo Predictor PRO v5.4 - © 2023 | Algoritmo: Análise Quântica + Fibonacci Dinâmico")
 
 # Aplicar classes CSS específicas via JavaScript
 st.markdown("""
 <script>
 // Aplica classes CSS aos botões
-document.querySelector('button[title="Clique para registrar vitória do Player"]').classList.add('player-btn');
-document.querySelector('button[title="Clique para registrar vitória do Banker"]').classList.add('banker-btn');
-document.querySelector('button[title="Clique para registrar um Tie"]').classList.add('tie-btn');
-document.querySelector('button[title="Limpa todo o histórico"]').classList.add('reset-btn');
+function applyButtonStyles() {
+    const buttons = document.querySelectorAll('.stButton>button');
+    buttons.forEach(btn => {
+        if (btn.textContent.includes('PLAYER')) btn.classList.add('player-btn');
+        if (btn.textContent.includes('BANKER')) btn.classList.add('banker-btn');
+        if (btn.textContent.includes('TIE')) btn.classList.add('tie-btn');
+        if (btn.textContent.includes('Reiniciar')) btn.classList.add('reset-btn');
+    });
+}
+
+// Executa quando a página carrega e após atualizações
+applyButtonStyles();
+document.addEventListener('DOMSubtreeModified', applyButtonStyles);
 </script>
 """, unsafe_allow_html=True)
